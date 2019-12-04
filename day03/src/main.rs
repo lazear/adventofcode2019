@@ -14,13 +14,13 @@ enum Direction {
     Right(isize),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct Point {
     x: isize,
     y: isize,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 struct Line {
     a: Point,
     b: Point,
@@ -53,8 +53,19 @@ impl Line {
         dy / dx
     }
 
-    fn intersect(self, other: Line) -> bool {
-        false
+    fn intersect(self, other: Line) -> Point {
+        let denom = (self.a.x - self.b.x) * (other.a.y - other.b.y)
+            - (self.a.y - self.b.y) * (other.a.x - other.b.x);
+
+        let x = (self.a.x * self.b.y - self.a.y * self.b.x) * (other.a.x - other.b.x)
+            - (self.a.x - self.b.x) * (other.a.x * other.b.y - other.a.y * other.b.x);
+        let y = (self.a.x * self.b.y - self.a.y * self.b.x) * (other.a.y - other.b.y)
+            - (self.a.y - self.b.y) * (other.a.x * other.b.y - other.a.y * other.b.x);
+
+        Point {
+            x: x / denom,
+            y: y / denom,
+        }
     }
 }
 
@@ -134,14 +145,9 @@ mod test {
             b: Point { x: 5, y: 5 },
         };
         let l2 = Line {
-            a: Point { x: 4, y: 2 },
-            b: Point { x: 0, y: 9 },
+            a: Point { x: 0, y: 5 },
+            b: Point { x: 5, y: 0 },
         };
-        let l3 = Line {
-            a: Point { x: 0, y: 3 },
-            b: Point { x: 0, y: 9 },
-        };
-        assert!(l1.intersect(l2));
-        assert!(!l1.intersect(l3));
+        assert_eq!(l1.intersect(l2), Point { x: 2, y: 2 });
     }
 }
