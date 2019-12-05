@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::io::{self, prelude::*};
@@ -32,26 +32,12 @@ struct Line {
     b: Point,
 }
 
-#[inline]
-fn in_interval(a: isize, b: isize, val: isize) -> bool {
-    let max = a.max(b);
-    let min = a.min(b);
-    (val >= min && val <= max)
-}
-
 impl Line {
     fn perp(self) -> Perp {
         if self.a.x == self.b.x {
             Perp::Vertical
         } else {
             Perp::Horizontal
-        }
-    }
-
-    fn contains(self, pt: Point) -> bool {
-        match self.perp() {
-            Perp::Vertical => in_interval(self.a.y, self.b.y, pt.y),
-            Perp::Horizontal => in_interval(self.a.x, self.b.x, pt.x),
         }
     }
 
@@ -76,7 +62,6 @@ impl Line {
                     // other must be horizontal, so it's Xs vary
                     for y in ymin..=ymax {
                         if y == other.a.y {
-                            println!("{:?} {:?} {} {} {}", self, other, ymin, ymax, y);
                             return Some(Point { x: self.a.x, y });
                         }
                     }
@@ -153,7 +138,6 @@ fn intersects(a: &[Line], b: &[Line]) -> HashSet<Point> {
     for i in a {
         for j in b {
             if let Some(pt) = i.intersect(*j) {
-                // println!("{:?} ... {:?} {:?}", pt, i, j);
                 pts.insert(pt);
             }
         }
@@ -187,8 +171,50 @@ fn part1<P: AsRef<Path>>(path: P) -> Result<usize, Box<dyn Error>> {
     Ok(closest)
 }
 
+fn intersects_steps(a: &[Line], b: &[Line]) -> HashMap<Point, usize> {
+    let mut pts = HashMap::new();
+    let origin = Point { x: 0, y: 0 };
+    let mut a_pt = origin;
+    let mut a_steps = 0;
+
+    for a_line in a {
+        let mut b_pt = origin;
+        let mut b_steps = 0;
+        for b_line in b {
+            if let Some(pt) = a_line.intersect(*b_line) {
+                if pt == origin {
+                    continue;
+                }
+
+                let _sa = a_line.a.dist(pt) + a_steps;
+                let _sb = b_line.a.dist(pt) + b_steps;
+                if !pts.contains_key(&pt) {
+                    pts.insert(pt, _sa + _sb);
+                }
+            }
+            b_steps += b_line.b.dist(b_pt);
+            b_pt = b_line.b;
+        }
+
+        a_steps += a_line.b.dist(a_pt);
+        a_pt = a_line.b;
+    }
+    pts
+}
+
+fn part2<P: AsRef<Path>>(path: P) -> Result<usize, Box<dyn Error>> {
+    let (wa, wb) = parse(path)?;
+    let la = to_lines(&wa);
+    let lb = to_lines(&wb);
+    let pts = intersects_steps(&la, &lb);
+    let closest = pts.values().min().unwrap();
+
+    Ok(*closest)
+}
+
 fn main() {
-    println!("Part 1: {}", part1("./day03/input.txt").unwrap());
+    println!("Part 1: {}", part1("./day03/test.txt").unwrap());
+    println!("Part 2: {}", part2("./day03/input.txt").unwrap());
 }
 
 #[cfg(test)]
