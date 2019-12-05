@@ -14,7 +14,13 @@ enum Direction {
     Right(isize),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
+enum Perp {
+    Vertical,
+    Horizontal,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 struct Point {
     x: isize,
     y: isize,
@@ -27,51 +33,79 @@ struct Line {
 }
 
 #[inline]
-fn in_interval(interval: (isize, isize), val: isize) -> bool {
-    val > interval.0 && val < interval.1
+fn in_interval(a: isize, b: isize, val: isize) -> bool {
+    let max = a.max(b);
+    let min = a.min(b);
+    (val >= min && val <= max)
 }
 
 impl Line {
-    fn contains(&self, pt: Point) -> bool {
-        let ix = (self.a.x.min(self.b.x), self.a.x.max(self.b.x));
-        let iy = (self.a.y.min(self.b.y), self.a.y.max(self.b.y));
-        // (pt.x >= ix.0 && ix.1 >= pt.x) || (ix.0 >= pt.x && pt.x >= ix.1)
-        // && (pt.y >= iy.0 && iy.1 >= pt.y) || (iy.0 >= pt.y && pt.y >= iy.1)
-
-        let dxc = pt.x - self.a.x;
-        let dyc = pt.y - self.a.y;
-
-        let dxl = self.b.x - self.a.x;
-        let dyl = self.b.y - self.b.y;
-        let cross = dxc * dyl - dyc * dxl;
-        cross == 0
-    }
-
-    fn slope(self) -> f32 {
-        let dx = (self.b.x - self.a.x) as f32;
-        let dy = (self.b.y - self.b.y) as f32;
-        dy / dx
-    }
-
-    fn intersect(self, other: Line) -> Point {
-        let denom = (self.a.x - self.b.x) * (other.a.y - other.b.y)
-            - (self.a.y - self.b.y) * (other.a.x - other.b.x);
-
-        let x = (self.a.x * self.b.y - self.a.y * self.b.x) * (other.a.x - other.b.x)
-            - (self.a.x - self.b.x) * (other.a.x * other.b.y - other.a.y * other.b.x);
-        let y = (self.a.x * self.b.y - self.a.y * self.b.x) * (other.a.y - other.b.y)
-            - (self.a.y - self.b.y) * (other.a.x * other.b.y - other.a.y * other.b.x);
-
-        Point {
-            x: x / denom,
-            y: y / denom,
+    fn perp(self) -> Perp {
+        if self.a.x == self.b.x {
+            Perp::Vertical
+        } else {
+            Perp::Horizontal
         }
+    }
+
+    fn contains(self, pt: Point) -> bool {
+        match self.perp() {
+            Perp::Vertical => in_interval(self.a.y, self.b.y, pt.y),
+            Perp::Horizontal => in_interval(self.a.x, self.b.x, pt.x),
+        }
+    }
+
+    fn intersect(self, other: Line) -> Option<Point> {
+        if self.perp() == other.perp() {
+            return None;
+        }
+
+        let xmin = self.a.x.min(self.b.x);
+        let xmax = self.a.x.max(self.b.x);
+        let ymin = self.a.y.min(self.b.y);
+        let ymax = self.a.y.max(self.b.y);
+
+        match self.perp() {
+            Perp::Vertical => {
+                assert_eq!(other.a.y, other.b.y);
+                assert_eq!(self.a.x, self.b.x);
+                if (other.a.y >= ymin && other.a.y <= ymax)
+                    && (self.a.x >= other.a.x.min(other.b.x)
+                        && self.a.x <= other.a.x.max(other.b.x))
+                {
+                    // other must be horizontal, so it's Xs vary
+                    for y in ymin..=ymax {
+                        if y == other.a.y {
+                            println!("{:?} {:?} {} {} {}", self, other, ymin, ymax, y);
+                            return Some(Point { x: self.a.x, y });
+                        }
+                    }
+                }
+            }
+            Perp::Horizontal => {
+                assert_eq!(other.a.x, other.b.x);
+                assert_eq!(self.a.y, self.b.y);
+                if (other.a.x >= xmin && other.a.x <= xmax)
+                    && (self.a.y >= other.a.y.min(other.b.y)
+                        && self.a.y <= other.a.y.max(other.b.y))
+                {
+                    // other must be vertical, so it's Ys vary
+                    for x in xmin..=xmax {
+                        if x == other.a.x {
+                            return Some(Point { x, y: self.a.y });
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 }
 
-#[derive(Default, Debug)]
-struct Grid {
-    inner: Vec<Vec<u8>>,
+impl Point {
+    fn dist(self, other: Point) -> usize {
+        ((self.x - other.x).abs() + (self.y - other.y).abs()) as usize
+    }
 }
 
 impl FromStr for Direction {
@@ -102,37 +136,59 @@ impl Add<Direction> for Point {
     }
 }
 
-impl Grid {
-    fn from_directions(dirs: &[Direction]) -> Self {
-        // first find dims
-        let mut init = Point { x: 0, y: 0 };
-        let mut points = vec![init];
-        for d in dirs {
-            init = init + *d;
-            points.push(init);
-        }
-        let xmin = points.iter().map(|p| p.x).min();
-        let ymin = points.iter().map(|p| p.y).min();
-        dbg!(ymin);
-        dbg!(xmin);
-        dbg!(points);
-        Grid::default()
+fn to_lines(dirs: &[Direction]) -> Vec<Line> {
+    // first find dims
+    let mut a = Point { x: 0, y: 0 };
+    let mut lines = vec![];
+    for d in dirs {
+        let b = a + *d;
+        lines.push(Line { a, b });
+        a = b;
     }
+    lines
 }
 
-fn parse<P: AsRef<Path>>(path: P) -> Result<Vec<Direction>, Box<dyn Error>> {
+fn intersects(a: &[Line], b: &[Line]) -> HashSet<Point> {
+    let mut pts = HashSet::new();
+    for i in a {
+        for j in b {
+            if let Some(pt) = i.intersect(*j) {
+                // println!("{:?} ... {:?} {:?}", pt, i, j);
+                pts.insert(pt);
+            }
+        }
+    }
+    pts.remove(&Point { x: 0, y: 0 });
+    pts
+}
+
+fn parse<P: AsRef<Path>>(path: P) -> Result<(Vec<Direction>, Vec<Direction>), Box<dyn Error>> {
     let s = fs::read_to_string(path)?;
-    Ok(s.split(|c: char| c == ',' || c.is_whitespace())
-        .filter(|s| s.len() > 0)
-        .map(|s| s.trim().parse::<Direction>())
-        .collect::<Result<_, _>>()?)
+    let mut lines = s
+        .lines()
+        .map(|s| {
+            s.split(',')
+                .map(|s| s.trim().parse::<Direction>())
+                .collect::<Result<_, _>>()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let a = lines.remove(0);
+    let b = lines.remove(0);
+    Ok((a, b))
+}
+
+fn part1<P: AsRef<Path>>(path: P) -> Result<usize, Box<dyn Error>> {
+    let (wa, wb) = parse(path)?;
+    let la = to_lines(&wa);
+    let lb = to_lines(&wb);
+    let pts = intersects(&la, &lb);
+    let origin = Point { x: 0, y: 0 };
+    let closest = pts.into_iter().map(|pt| pt.dist(origin)).min().unwrap();
+    Ok(closest)
 }
 
 fn main() {
-    let data = parse("./day03/input.txt").unwrap();
-    // dbg!(data);
-    Grid::from_directions(&data);
-    println!("Hello, world!");
+    println!("Part 1: {}", part1("./day03/input.txt").unwrap());
 }
 
 #[cfg(test)]
@@ -142,12 +198,27 @@ mod test {
     fn intersect() {
         let l1 = Line {
             a: Point { x: 0, y: 0 },
-            b: Point { x: 5, y: 5 },
-        };
-        let l2 = Line {
-            a: Point { x: 0, y: 5 },
             b: Point { x: 5, y: 0 },
         };
-        assert_eq!(l1.intersect(l2), Point { x: 2, y: 2 });
+        let l2 = Line {
+            a: Point { x: 5, y: 5 },
+            b: Point { x: 5, y: -1 },
+        };
+        assert_eq!(l1.intersect(l2), Some(Point { x: 5, y: 0 }));
+        assert_eq!(l2.intersect(l1), Some(Point { x: 5, y: 0 }));
+    }
+
+    #[test]
+    fn test() {
+        let (wa, wb) = parse("../day03/test.txt").unwrap();
+        let la = to_lines(&wa);
+        let lb = to_lines(&wb);
+        let pts = intersects(&la, &lb);
+        assert_eq!(
+            pts,
+            vec![Point { x: 3, y: -3 }, Point { x: 6, y: -5 }]
+                .into_iter()
+                .collect()
+        );
     }
 }
