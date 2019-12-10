@@ -1,12 +1,12 @@
 use intcode::Vm;
 
-fn part1(input: &str) -> Option<isize> {
-    let mut vm = input.parse::<Vm>().ok()?;
+fn part1(input: &str) -> Result<isize, intcode::Error> {
+    let mut vm = input.parse::<Vm>().unwrap();
     vm.run(std::iter::repeat(1))
 }
 
-fn part2(input: &str) -> Option<isize> {
-    let mut vm = input.parse::<Vm>().ok()?;
+fn part2(input: &str) -> Result<isize, intcode::Error> {
+    let mut vm = input.parse::<Vm>().unwrap();
     vm.run(std::iter::repeat(5))
 }
 
