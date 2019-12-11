@@ -11,8 +11,8 @@ pub enum Mode {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Error {
     InvalidData,
-    InvalidInstr,
-    InvalidAddr,
+    InvalidInstr(usize, isize),
+    InvalidAddr(usize),
     InvalidMode,
     NoInput,
     Halted,
@@ -67,7 +67,7 @@ impl Vm {
     }
 
     fn read_param(&mut self, mode_flag: isize) -> Result<Mode, Error> {
-        let &a = self.data.get(self.ip).ok_or(Error::InvalidAddr)?;
+        let &a = self.data.get(self.ip).ok_or(Error::InvalidAddr(self.ip))?;
         self.ip += 1;
         match mode_flag {
             0 => Ok(Mode::Position(a as usize)),
@@ -78,13 +78,13 @@ impl Vm {
     }
 
     fn read_position(&mut self) -> Result<usize, Error> {
-        let &a = self.data.get(self.ip).ok_or(Error::InvalidAddr)?;
+        let &a = self.data.get(self.ip).ok_or(Error::InvalidAddr(self.ip))?;
         self.ip += 1;
         Ok(a as usize)
     }
 
     fn opcode(&mut self) -> Result<Opcode, Error> {
-        let &instr = self.data.get(self.ip).ok_or(Error::InvalidAddr)?;
+        let &instr = self.data.get(self.ip).ok_or(Error::InvalidAddr(self.ip))?;
         // if instr
         self.ip += 1;
         let a = (instr / 10000) % 10;
@@ -94,7 +94,7 @@ impl Vm {
         if a != 0 {
             return Err(Error::InvalidMode);
         }
-        if instr & 100 == 99 {
+        if instr % 100 == 99 {
             return Ok(Opcode::Halt);
         }
         match instr % 10 {
@@ -108,7 +108,7 @@ impl Vm {
                 self.read_param(b)?,
                 self.read_position()?,
             )),
-            3 => Ok(Opcode::Input(self.read_param(a)?)),
+            3 => Ok(Opcode::Input(self.read_param(c)?)),
             4 => Ok(Opcode::Output(self.read_param(c)?)),
             5 => Ok(Opcode::Jnz(self.read_param(c)?, self.read_param(b)?)),
             6 => Ok(Opcode::Jz(self.read_param(c)?, self.read_param(b)?)),
@@ -123,20 +123,24 @@ impl Vm {
                 self.read_position()?,
             )),
             9 => Ok(Opcode::Offset(self.read_position()? as isize)),
-            _ => Err(Error::InvalidInstr),
+            _ => Err(Error::InvalidInstr(self.ip - 1, instr)),
         }
     }
 
-    fn fetch(&self, mode: Mode) -> Result<isize, Error> {
+    fn fetch(&mut self, mode: Mode) -> Result<isize, Error> {
         match mode {
             Mode::Immediate(i) => Ok(i),
-            Mode::Position(idx) => self.data.get(idx).copied().ok_or(Error::InvalidAddr),
+            Mode::Position(idx) => {
+                // self.data.get(idx).copied().ok_or(Error::InvalidAddr(idx))
+                Ok(self.get_or_extend(idx))
+            }
             Mode::Relative(off) => {
                 let base = usize::try_from(self.base as isize + off).expect(&format!(
                     "relative addr out of bounds: {}+{}",
                     self.base, off
                 ));
-                self.data.get(base).copied().ok_or(Error::InvalidAddr)
+                Ok(self.get_or_extend(base))
+                // self.data.get(base).copied().ok_or(Error::InvalidAddr(base))
             }
         }
     }
@@ -145,28 +149,23 @@ impl Vm {
         while self.ip < self.data.len() {
             print!("{}: ", self.ip);
             match self.opcode() {
-                Ok(Opcode::Jz(a, b)) => {
-                    println!("{:?}", Opcode::Jz(a, b));
-                    if self.fetch(a) == Ok(0) {
-                        self.ip = self.fetch(b).unwrap() as usize;
-                    }
-                }
-                Ok(Opcode::Jnz(a, b)) => {
-                    println!("{:?}", Opcode::Jnz(a, b));
-                    if self.fetch(a) != Ok(0) {
-                        self.ip = self.fetch(b).unwrap() as usize;
-                    }
-                }
                 Ok(Opcode::Offset(off)) => {
                     self.base = usize::try_from(self.base as isize + off).unwrap()
                 }
                 Ok(op) => println!("{:?}", op),
                 _ => {
-                    self.ip += 2;
-                    break;
+                    self.ip += 1;
                 }
             }
         }
+    }
+
+    fn get_or_extend(&mut self, loc: usize) -> isize {
+        if loc >= self.data.len() {
+            self.data
+                .extend(std::iter::repeat(0).take(2 * (loc - self.data.len())));
+        }
+        self.data[loc]
     }
 
     fn store_or_extend(&mut self, loc: usize, data: isize) {
@@ -174,30 +173,40 @@ impl Vm {
             self.data
                 .extend(std::iter::repeat(0).take(2 * (loc - self.data.len())));
         }
+        self.data[loc] = data;
     }
 
     pub fn run<I: Iterator<Item = isize>>(&mut self, mut input: I) -> Result<isize, Error> {
-        self.ip = 0;
-        self.base = 0;
         while self.ip < self.data.len() {
             let ip = self.ip;
             let op = self.opcode()?;
+            assert!(self.ip > ip);
 
-            print!("{:3}: ", ip);
-            op.pretty_print(&self);
+            // print!("{:3}: ", ip);
+            // op.pretty_print(&self);
             match op {
                 Opcode::Halt => {
                     return Err(Error::Halted);
                 }
                 Opcode::Add(a, b, c) => {
-                    self.store_or_extend(c, self.fetch(a)? + self.fetch(b)?);
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, a + b);
                 }
                 Opcode::Mul(a, b, c) => {
-                    self.store_or_extend(c, self.fetch(a)? * self.fetch(b)?);
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, a * b);
                 }
                 Opcode::Input(idx) => {
                     self.store_or_extend(
-                        self.fetch(idx)? as usize,
+                        match idx {
+                            Mode::Position(x) => x,
+                            Mode::Relative(off) => {
+                                usize::try_from(self.base as isize + off).unwrap()
+                            }
+                            _ => unimplemented!(),
+                        },
                         input.next().ok_or(Error::NoInput)?,
                     );
                 }
@@ -210,34 +219,28 @@ impl Vm {
                     // }
                 }
                 Opcode::Jnz(a, b) => {
-                    if self.fetch(a)? != 0 {
-                        self.ip = self.fetch(b)? as usize;
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    if a != 0 {
+                        self.ip = b as usize;
                     }
                 }
                 Opcode::Jz(a, b) => {
-                    if self.fetch(a)? == 0 {
-                        self.ip = self.fetch(b)? as usize;
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    if a == 0 {
+                        self.ip = b as usize;
                     }
                 }
                 Opcode::Lt(a, b, c) => {
-                    self.store_or_extend(
-                        c,
-                        if self.fetch(a)? < self.fetch(b)? {
-                            1
-                        } else {
-                            0
-                        },
-                    );
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, if a < b { 1 } else { 0 });
                 }
                 Opcode::Eq(a, b, c) => {
-                    self.store_or_extend(
-                        c,
-                        if self.fetch(a)? == self.fetch(b)? {
-                            1
-                        } else {
-                            0
-                        },
-                    );
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, if a == b { 1 } else { 0 });
                 }
                 Opcode::Offset(a) => {
                     self.base = usize::try_from(self.base as isize + a).unwrap();
@@ -286,6 +289,7 @@ mod test {
     fn jump_test() {
         let ex = "3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99";
         let mut vm = ex.parse::<Vm>().unwrap();
+        vm.clone().decompile();
         assert_eq!(vm.run(std::iter::repeat(7)), Ok(999));
         let mut vm = ex.parse::<Vm>().unwrap();
         assert_eq!(vm.run(std::iter::repeat(8)), Ok(1000));
