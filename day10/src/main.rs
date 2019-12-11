@@ -1,55 +1,5 @@
+use grid::{Grid, Point};
 use std::collections::HashMap;
-use std::ops::{Index, IndexMut};
-
-#[derive(Copy, Clone, Default, PartialEq)]
-struct Point {
-    x: usize,
-    y: usize,
-}
-
-impl std::fmt::Debug for Point {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "({},{})", self.x, self.y)
-    }
-}
-
-struct Grid<T> {
-    rows: usize,
-    cols: usize,
-    grid: Vec<T>,
-}
-
-struct PointIter {
-    len: usize,
-    cols: usize,
-    pos: usize,
-}
-
-impl Iterator for PointIter {
-    type Item = Point;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.len {
-            return None;
-        }
-        let y = self.pos / self.cols;
-        let x = self.pos % self.cols;
-        self.pos += 1;
-        Some(Point { x, y })
-    }
-}
-
-impl<T> Index<Point> for Grid<T> {
-    type Output = T;
-    fn index(&self, by: Point) -> &Self::Output {
-        &self.grid[self.cols * by.y + by.x]
-    }
-}
-
-impl<T> IndexMut<Point> for Grid<T> {
-    fn index_mut(&mut self, by: Point) -> &mut Self::Output {
-        &mut self.grid[self.cols * by.y + by.x]
-    }
-}
 
 #[derive(Copy, Clone, PartialEq, PartialOrd, Eq, Hash, Debug)]
 enum Slope {
@@ -94,41 +44,16 @@ impl std::cmp::Ord for Slope {
     }
 }
 
-impl<T> Grid<T> {
-    pub fn iter_points(&self) -> PointIter {
-        PointIter {
-            len: self.cols * self.rows,
-            cols: self.cols,
-            pos: 0,
-        }
-    }
-
-    pub fn iter(&self) -> std::iter::Zip<PointIter, std::slice::Iter<T>> {
-        self.iter_points().zip(self.grid.iter())
-    }
-}
-
-impl Point {
-    pub fn new(x: usize, y: usize) -> Point {
-        Point { x, y }
-    }
-
-    pub fn manhattan(&self, other: Point) -> usize {
-        ((self.x as isize - other.x as isize).abs() + (self.y as isize - other.y as isize).abs())
-            as usize
-    }
-
-    pub fn slope(&self, b: Point) -> Slope {
-        let dx = self.x as isize - b.x as isize;
-        let dy = self.y as isize - b.y as isize;
-        if dx == 0 {
-            Slope::Vertical(dy > 0)
-        } else if dy == 0 {
-            Slope::Horizontal(dx > 0)
-        } else {
-            let s = dy as f64 / dx as f64;
-            Slope::Diagonal((s * 1000.0).floor() as isize, dy > 0, dx > 0)
-        }
+fn slope(a: Point, b: Point) -> Slope {
+    let dx = a.x as isize - b.x as isize;
+    let dy = a.y as isize - b.y as isize;
+    if dx == 0 {
+        Slope::Vertical(dy > 0)
+    } else if dy == 0 {
+        Slope::Horizontal(dx > 0)
+    } else {
+        let s = dy as f64 / dx as f64;
+        Slope::Diagonal((s * 1000.0).floor() as isize, dy > 0, dx > 0)
     }
 }
 
@@ -147,24 +72,6 @@ impl std::fmt::Display for Space {
     }
 }
 
-impl<T: std::fmt::Display> std::fmt::Display for Grid<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.grid
-                .chunks_exact(self.cols)
-                .map(|row| row
-                    .iter()
-                    .map(|sp| sp.to_string())
-                    .collect::<Vec<_>>()
-                    .join(""))
-                .collect::<Vec<String>>()
-                .join("\n")
-        )
-    }
-}
-
 fn part1(grid: &Grid<Space>) -> (usize, Point) {
     let mut max = (0, Point::new(0, 0));
     for (base, _) in grid.iter().filter(|(_, &space)| space == Space::Asteroid) {
@@ -176,7 +83,7 @@ fn part1(grid: &Grid<Space>) -> (usize, Point) {
         let mut slopes = HashMap::new();
         for pt in other {
             slopes
-                .entry(base.slope(pt))
+                .entry(slope(base, pt))
                 .or_insert_with(Vec::new)
                 .push(pt);
         }
@@ -197,7 +104,7 @@ fn part2(grid: &Grid<Space>, base: Point) -> usize {
     let mut slopes = HashMap::new();
     for pt in other {
         slopes
-            .entry(base.slope(pt))
+            .entry(slope(base, pt))
             .or_insert_with(Vec::new)
             .push(pt);
     }
@@ -235,7 +142,7 @@ fn parse(input: &str) -> Grid<Space> {
         }
         rows += 1;
     }
-    Grid { cols, rows, grid }
+    Grid::new(cols, rows, grid)
 }
 
 fn main() {
@@ -255,37 +162,4 @@ fn example() {
     assert_eq!(reach, 210);
     assert_eq!(pt, Point::new(11, 13));
     assert_eq!(part2(&grid, pt), 802);
-}
-
-#[test]
-fn grid_indexing() {
-    let grid: Grid<i32> = Grid {
-        cols: 3,
-        rows: 3,
-        grid: vec![0, 1, 2, 3, 4, 5, 6, 7, 8],
-    };
-    assert_eq!(grid[Point::new(0, 0)], 0i32);
-    assert_eq!(grid[Point::new(1, 1)], 4i32);
-    assert_eq!(grid[Point::new(2, 2)], 8i32);
-}
-
-#[test]
-fn grid_iter() {
-    let grid: Grid<i32> = Grid {
-        cols: 3,
-        rows: 3,
-        grid: vec![0, 1, 2, 3, 4, 5, 6, 7, 8],
-    };
-
-    let iter = grid.iter_points();
-    assert_eq!(
-        iter.take(5).collect::<Vec<_>>(),
-        vec![
-            Point::new(0, 0),
-            Point::new(1, 0),
-            Point::new(2, 0),
-            Point::new(0, 1),
-            Point::new(1, 1)
-        ]
-    );
 }
