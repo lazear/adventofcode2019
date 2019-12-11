@@ -2,12 +2,12 @@ use intcode::Vm;
 
 fn part1(input: &str) -> Result<isize, intcode::Error> {
     let mut vm = input.parse::<Vm>().unwrap();
-    vm.run(std::iter::repeat(1))
+    vm.run(std::iter::repeat(1), false)
 }
 
 fn part2(input: &str) -> Result<isize, intcode::Error> {
     let mut vm = input.parse::<Vm>().unwrap();
-    vm.run(std::iter::repeat(5))
+    vm.run(std::iter::repeat(5), false)
 }
 
 fn main() -> std::io::Result<()> {

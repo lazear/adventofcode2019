@@ -33,11 +33,14 @@ impl Iterator for Iter {
 fn phrase(vm: &Vm, phrase: &[isize]) -> isize {
     phrase.into_iter().fold(0, |acc, ph| {
         vm.clone()
-            .run(Iter {
-                phase: *ph,
-                input: acc,
-                state: 0,
-            })
+            .run(
+                Iter {
+                    phase: *ph,
+                    input: acc,
+                    state: 0,
+                },
+                false,
+            )
             .unwrap()
     })
 }
@@ -76,16 +79,37 @@ fn run_loop(mut vms: Vec<Vm>, phase: &[isize]) -> isize {
     let mut acc = 0;
     let mut max = 0;
 
-    while let Ok(x) = vms
-        .iter_mut()
-        .zip(phase)
-        .try_fold(acc, |acc, (v, &phase)| v.run(Iter::new(phase, acc)))
-    {
-        max = max.max(x);
-        acc = x;
+    for i in 0..5 {
+        match vms[i].run(Iter::new(phase[i], acc), false) {
+            Ok(x) => {
+                acc = x;
+                // continue;
+            }
+            Err(e) => {
+                if i == 4 {
+                    // break 'outer;
+                    break;
+                }
+            }
+        }
     }
 
-    // println!("loop complete");
+    'outer: loop {
+        for i in 0..5 {
+            match vms[i].run(std::iter::once(acc), false) {
+                Ok(x) => {
+                    acc = x;
+                    // continue;
+                }
+                Err(e) => {
+                    if i == 4 {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
+
     acc
 }
 
@@ -100,6 +124,7 @@ fn part2(input: &str) -> Option<isize> {
 
     for p in &v {
         let x = run_loop(vms.clone(), p);
+        max = max.max(x);
         // println!("{}", x);
     }
 
@@ -154,11 +179,14 @@ fn examples_part2() {
 
         'outer: loop {
             for ph in phrase {
-                x = match vm.run(Iter {
-                    phase: *ph,
-                    input: x,
-                    state: 0,
-                }) {
+                x = match vm.run(
+                    Iter {
+                        phase: *ph,
+                        input: x,
+                        state: 0,
+                    },
+                    true,
+                ) {
                     Ok(x) => dbg!(x),
                     Err(e) => {
                         println!("fail {:?}", &phrase);

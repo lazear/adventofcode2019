@@ -184,14 +184,21 @@ impl Vm {
         self.data[loc] = data;
     }
 
-    pub fn run<I: Iterator<Item = isize>>(&mut self, mut input: I) -> Result<isize, Error> {
+    pub fn run<I: Iterator<Item = isize>>(
+        &mut self,
+        mut input: I,
+        verbose: bool,
+    ) -> Result<isize, Error> {
         while self.ip < self.data.len() {
             let ip = self.ip;
             let op = self.opcode()?;
             assert!(self.ip > ip);
 
-            // print!("{:3}: ", ip);
-            // op.pretty_print(&self);
+            if verbose {
+                print!("{:3}: ", ip);
+                op.pretty_print(&self);
+            }
+
             match op {
                 Opcode::Halt => {
                     return Err(Error::Halted);
@@ -292,11 +299,11 @@ mod test {
         let ex = "3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99";
         let mut vm = ex.parse::<Vm>().unwrap();
         vm.clone().decompile();
-        assert_eq!(vm.run(std::iter::repeat(7)), Ok(999));
+        assert_eq!(vm.run(std::iter::repeat(7), true), Ok(999));
         let mut vm = ex.parse::<Vm>().unwrap();
-        assert_eq!(vm.run(std::iter::repeat(8)), Ok(1000));
+        assert_eq!(vm.run(std::iter::repeat(8), true), Ok(1000));
         let mut vm = ex.parse::<Vm>().unwrap();
-        assert_eq!(vm.run(std::iter::repeat(9)), Ok(1001));
+        assert_eq!(vm.run(std::iter::repeat(9), true), Ok(1001));
     }
 
     #[test]
@@ -304,12 +311,12 @@ mod test {
         let ex = "109,19,99";
         let mut vm = ex.parse::<Vm>().unwrap();
         // vm.clone().decompile();
-        assert_eq!(vm.run(std::iter::repeat(0)), Err(Error::Halted));
+        assert_eq!(vm.run(std::iter::repeat(0), true), Err(Error::Halted));
         assert_eq!(vm.base, 19);
 
         let ex = "104,1125899906842624,99";
         let mut vm = ex.parse::<Vm>().unwrap();
-        assert_eq!(vm.run(std::iter::repeat(0)), Ok(1125899906842624));
+        assert_eq!(vm.run(std::iter::repeat(0), true), Ok(1125899906842624));
     }
 
     #[test]
@@ -319,6 +326,6 @@ mod test {
         // output cell 0
         let ex = "109,9,2105,4,-1,4,0,99,5";
         let mut vm = ex.parse::<Vm>().unwrap();
-        assert_eq!(vm.run(std::iter::repeat(0)), Ok(109));
+        assert_eq!(vm.run(std::iter::repeat(0), true), Ok(109));
     }
 }
