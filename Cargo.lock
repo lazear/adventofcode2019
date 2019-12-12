@@ -63,10 +63,6 @@ dependencies = [
 [[package]]
 name = "day12"
 version = "0.1.0"
-dependencies = [
- "grid 0.1.0",
- "intcode 0.1.0",
-]
 
 [[package]]
 name = "grid"

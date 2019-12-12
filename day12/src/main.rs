@@ -1,11 +1,9 @@
-use grid::*;
-use intcode::*;
-use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
+use std::collections::HashSet;
 use std::error::Error;
 use std::iter::Iterator;
 use std::usize;
 
+/// That's no moon!
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 struct Moon {
     x: isize,
@@ -19,13 +17,6 @@ struct Velocity {
     dx: isize,
     dy: isize,
     dz: isize,
-}
-
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-struct Deriv {
-    dxdt: isize,
-    dydt: isize,
-    dzdt: isize,
 }
 
 impl Moon {
