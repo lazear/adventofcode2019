@@ -76,23 +76,9 @@ fn part1(input: &str) -> Option<isize> {
 }
 
 fn run_loop(mut vms: Vec<Vm>, phase: &[isize]) -> isize {
-    let mut acc = 0;
-    let mut max = 0;
-
-    for i in 0..5 {
-        match vms[i].run(Iter::new(phase[i], acc), false) {
-            Ok(x) => {
-                acc = x;
-                // continue;
-            }
-            Err(e) => {
-                if i == 4 {
-                    // break 'outer;
-                    break;
-                }
-            }
-        }
-    }
+    let mut acc = vms.iter_mut().zip(phase).fold(0, |acc, (vm, ph)| {
+        vm.run(Iter::new(*ph, acc), false).unwrap()
+    });
 
     'outer: loop {
         for i in 0..5 {
