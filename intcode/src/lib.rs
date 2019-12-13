@@ -53,7 +53,7 @@ impl Opcode {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Vm {
     pub data: Vec<isize>,
-    ip: usize,
+    pub ip: usize,
     base: usize,
 }
 
