@@ -1,35 +1,8 @@
 use grid::{Grid, Point};
 use intcode::Vm;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::error::Error;
 use std::iter::Iterator;
-
-fn parse(input: &str) -> Option<Vec<isize>> {
-    input
-        .split(',')
-        .map(|s| s.parse::<isize>())
-        .collect::<Result<Vec<_>, _>>()
-        .ok()
-}
-
-struct Iter {
-    ball: Coord,
-    paddle: Coord,
-}
-
-impl Iterator for Iter {
-    type Item = isize;
-    fn next(&mut self) -> Option<isize> {
-        Some(if self.ball.x > self.paddle.x {
-            1
-        } else if self.ball.x == self.paddle.x {
-            0
-        } else {
-            1
-        })
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 struct Coord {
@@ -67,43 +40,32 @@ fn pretty_print(colors: HashMap<Coord, isize>) {
     println!("{}", grid);
 }
 
-fn main() {
-    let input = std::fs::read_to_string("./day13/input.txt").unwrap();
-
-    let mut vm = input.parse::<Vm>().unwrap();
+fn part1(mut vm: Vm) -> usize {
     vm.data[0] = 2;
-    // let mut out = Vec::new();
+    let mut out = Vec::new();
+    loop {
+        match vm.run(std::iter::repeat(0), false) {
+            Ok(r) => out.push(r),
+            Err(e) => {
+                dbg!(e);
+                break;
+            }
+        }
+    }
+    out.chunks_exact(3).filter(|s| s[2] == 2).count()
+}
 
-    // loop {
-
-    //     match vm.run(Iter { ball, paddle}, false) {
-    //         Ok(r) => out.push(r),
-    //         Err(e) => {
-    //             // dbg!(e);
-    //             break;
-    //         }
-    //     }
-    // }
-
-    // // let x =
-
-    // let dimx = objs.iter().map(|x| x.0.x).max().unwrap() as usize;
-    // let dimy = objs.iter().map(|x| x.0.y).max().unwrap();
-
-    // dbg!(dimx, dimy);
-
-    // let mut g = Grid::new(dimx, dimy, std::iter::repeat(7).take(dimx*dimy).collect());
-    // let mut vm = input.parse::<Vm>().unwrap();
-    //
+fn part2(mut vm: Vm) -> isize {
     loop {
         vm.ip = 0;
         vm.data[0] = 2;
         let mut out = Vec::new();
-        let mut ball = Coord::new(0, 0);
-        let mut paddle = Coord::new(0, 0);
 
         loop {
-            match vm.run(Iter { ball, paddle }, false) {
+            // This ended up being MUCH simpler than I thought, you don't
+            // actually even need to supply smart input. I intially tried
+            // to track the paddle and ball location.
+            match vm.run(std::iter::repeat(0), false) {
                 Ok(r) => out.push(r),
                 Err(e) => {
                     // dbg!(e);
@@ -123,39 +85,28 @@ fn main() {
         }
 
         pretty_print(map);
-        // dbg!(&out);
-        ball = out
-            .chunks_exact(3)
-            .filter(|x| x[2] == 4)
-            .map(|x| Coord::new(x[0], x[1]))
-            .next()
-            .unwrap_or_else(|| Coord::new(0, 0));
-        paddle = out
-            .chunks_exact(3)
-            .filter(|x| x[2] == 3)
-            .map(|x| Coord::new(x[0], x[1]))
-            .next()
-            .unwrap_or_else(|| Coord::new(0, 0));
-        // dbg!(ball, paddle);
 
-        let mut score = out
-        .chunks_exact(3)
-        .filter(|x| x[0] == -1 && x[1] == 0)
-        .map(|x| x[2])
-        .collect::<Vec<_>>();
+        let score = out
+            .chunks_exact(3)
+            .filter(|x| x[0] == -1 && x[1] == 0)
+            .map(|x| x[2])
+            .collect::<Vec<_>>();
 
         if out
-        .chunks_exact(3)
-        .filter(|x| x[0] != -1 && x[2] == 2)
-        .count() == 0
+            .chunks_exact(3)
+            .filter(|x| x[0] != -1 && x[2] == 2)
+            .count()
+            == 0
         {
-            
             println!("Hello as, world! {:?}", score);
-            break;
-
-            // break;
+            return score[0];
         }
     }
+}
 
-    // println!("Hello, world! {}", g);
+fn main() {
+    let input = std::fs::read_to_string("./day13/input.txt").unwrap();
+    let vm = input.parse::<Vm>().unwrap();
+    println!("Part 1: {}", part1(vm.clone()));
+    println!("Part 2: {}", part2(vm));
 }
