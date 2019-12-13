@@ -1,44 +1,8 @@
-use grid::{Grid, Point};
+use grid::{Grid, Coord};
 use intcode::Vm;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::iter::Iterator;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-struct Coord {
-    x: isize,
-    y: isize,
-}
-
-impl Coord {
-    pub fn new(x: isize, y: isize) -> Self {
-        Self { x, y }
-    }
-}
-
-fn pretty_print(colors: HashMap<Coord, isize>) {
-    let min_x = colors.keys().map(|c| c.x).min().unwrap();
-    let min_y = colors.keys().map(|c| c.y).min().unwrap();
-    let max_x = colors.keys().map(|c| c.x).max().unwrap();
-    let max_y = colors.keys().map(|c| c.y).max().unwrap();
-
-    let cols = usize::try_from(max_x - min_x).unwrap() + 1;
-    let rows = usize::try_from(max_y - min_y).unwrap() + 1;
-    let g = std::iter::repeat('.')
-        .take(cols * rows)
-        .collect::<Vec<char>>();
-
-    let mut grid = Grid::new(cols, rows, g);
-
-    for (coord, color) in colors {
-        let pt = Point::new(
-            (coord.x + min_x.abs()) as usize,
-            (coord.y + min_y.abs()) as usize,
-        );
-        grid[pt] = (color as u8 + '0' as u8) as char;
-    }
-    println!("{}", grid);
-}
 
 fn part1(mut vm: Vm) -> usize {
     vm.data[0] = 2;
@@ -84,7 +48,11 @@ fn part2(mut vm: Vm) -> isize {
             map.insert(pt, o);
         }
 
-        pretty_print(map);
+        let g = Coord::to_grid(map);
+        println!("{}", g);
+
+
+        // pretty_print(map);
 
         let score = out
             .chunks_exact(3)
