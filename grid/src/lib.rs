@@ -124,13 +124,14 @@ impl Coord {
     /// to (0,0), and all other points are modified to have the same relative
     /// position
     pub fn to_grid<T: Default + Clone>(data: HashMap<Coord, T>) -> Grid<T> {
-        let min_x = data.keys().map(|c| c.x).min().unwrap();
-        let min_y = data.keys().map(|c| c.y).min().unwrap();
-        let max_x = data.keys().map(|c| c.x).max().unwrap();
-        let max_y = data.keys().map(|c| c.y).max().unwrap();
+        assert!(data.len() > 0);
+        let min_x = data.keys().map(|c| c.x).min().unwrap_or(0);
+        let min_y = data.keys().map(|c| c.y).min().unwrap_or(0);
+        let max_x = data.keys().map(|c| c.x).max().expect("max_x fail");
+        let max_y = data.keys().map(|c| c.y).max().expect("max_y fail");
 
-        let cols = usize::try_from(max_x - min_x).unwrap() + 1;
-        let rows = usize::try_from(max_y - min_y).unwrap() + 1;
+        let cols = usize::try_from(max_x - min_x).expect("cols failed") + 1;
+        let rows = usize::try_from(max_y - min_y).expect("rows failed") + 1;
 
         let g = std::iter::repeat(T::default())
             .take(cols * rows)
