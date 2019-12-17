@@ -17,10 +17,16 @@ pub struct Coord {
     pub y: isize,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Direction {
     Up,
     Down,
+    Left,
+    Right,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
+pub enum Rotation {
     Left,
     Right,
 }
@@ -90,6 +96,10 @@ impl<T> Grid<T> {
 
     pub fn iter(&self) -> std::iter::Zip<PointIter, std::slice::Iter<T>> {
         self.iter_points().zip(self.grid.iter())
+    }
+
+    pub fn in_bounds(&self, pt: Point) -> bool {
+        pt.x < self.cols && pt.y < self.rows
     }
 }
 
@@ -195,6 +205,35 @@ impl Coord {
             Direction::Right => Coord {
                 x: self.x + 1,
                 y: self.y,
+            },
+        }
+    }
+}
+
+impl<T: Clone> Clone for Grid<T> {
+    fn clone(&self) -> Grid<T> {
+        Grid {
+            cols: self.cols,
+            rows: self.rows,
+            grid: self.grid.clone(),
+        }
+    }
+}
+
+impl Direction {
+    pub fn rotate(self, rotation: Rotation) -> Direction {
+        match rotation {
+            Rotation::Left => match self {
+                Direction::Up => Direction::Left,
+                Direction::Down => Direction::Right,
+                Direction::Left => Direction::Down,
+                Direction::Right => Direction::Up,
+            },
+            Rotation::Right => match self {
+                Direction::Up => Direction::Right,
+                Direction::Down => Direction::Left,
+                Direction::Left => Direction::Up,
+                Direction::Right => Direction::Down,
             },
         }
     }

@@ -67,20 +67,19 @@ impl Game {
 
     pub fn find_edge(&mut self, edge: Direction, opp: Direction) -> usize {
         let mut total = 0;
-        loop {            
+        loop {
             let mut steps = 0;
             while let Ok(Status::Success) = self.step(edge) {
                 steps += 1;
             }
             if steps > 1 {
                 match self.step(opp) {
-                    Ok(Status::Success) => steps+=1,
+                    Ok(Status::Success) => steps += 1,
                     _ => return total + steps,
                 }
-            } 
+            }
             total += steps;
         }
-        
     }
 }
 
@@ -96,7 +95,7 @@ fn main() {
 
     while game.find_edge(Direction::Left, Direction::Right) > 1 {
         let _ = game.step(Direction::Down);
-    }   
+    }
 
     println!("\n\n{}", game.grid());
 }

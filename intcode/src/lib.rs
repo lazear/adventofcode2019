@@ -251,6 +251,72 @@ impl Vm {
         }
         Err(Error::Halted)
     }
+
+    pub fn run_fn<F: FnMut() -> isize>(
+        &mut self,
+        mut input: F,
+        verbose: bool,
+    ) -> Result<isize, Error> {
+        while self.ip < self.data.len() {
+            let ip = self.ip;
+            let op = self.opcode()?;
+            assert!(self.ip > ip);
+
+            if verbose {
+                print!("{:3}: ", ip);
+                op.pretty_print(&self);
+            }
+
+            match op {
+                Opcode::Halt => {
+                    return Err(Error::Halted);
+                }
+                Opcode::Add(a, b, c) => {
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, a + b);
+                }
+                Opcode::Mul(a, b, c) => {
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, a * b);
+                }
+                Opcode::Input(idx) => self.store_or_extend(idx, input()),
+                Opcode::Output(mode) => {
+                    return self.fetch(mode);
+                }
+                Opcode::Jnz(a, b) => {
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    if a != 0 {
+                        self.ip = b as usize;
+                    }
+                }
+                Opcode::Jz(a, b) => {
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    if a == 0 {
+                        self.ip = b as usize;
+                    }
+                }
+                Opcode::Lt(a, b, c) => {
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, if a < b { 1 } else { 0 });
+                }
+                Opcode::Eq(a, b, c) => {
+                    let a = self.fetch(a)?;
+                    let b = self.fetch(b)?;
+                    self.store_or_extend(c, if a == b { 1 } else { 0 });
+                }
+                Opcode::Offset(a) => {
+                    let off = self.fetch(a)?;
+                    self.base = usize::try_from(self.base as isize + off).unwrap();
+                }
+            }
+        }
+        Err(Error::Halted)
+    }
 }
 
 impl FromStr for Vm {
