@@ -17,6 +17,14 @@ pub struct Coord {
     pub y: isize,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 impl std::fmt::Debug for Point {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "({},{})", self.x, self.y)
@@ -94,6 +102,27 @@ impl Point {
         ((self.x as isize - other.x as isize).abs() + (self.y as isize - other.y as isize).abs())
             as usize
     }
+
+    pub fn move_one(self, dir: Direction) -> Point {
+        match dir {
+            Direction::Up => Point {
+                x: self.x,
+                y: self.y.saturating_sub(1),
+            },
+            Direction::Down => Point {
+                x: self.x,
+                y: self.y + 1,
+            },
+            Direction::Left => Point {
+                x: self.x.saturating_sub(1),
+                y: self.y,
+            },
+            Direction::Right => Point {
+                x: self.x + 1,
+                y: self.y,
+            },
+        }
+    }
 }
 
 impl<T: Display> Display for Grid<T> {
@@ -125,8 +154,8 @@ impl Coord {
     /// position
     pub fn to_grid<T: Default + Clone>(data: HashMap<Coord, T>) -> Grid<T> {
         assert!(data.len() > 0);
-        let min_x = data.keys().map(|c| c.x).min().unwrap_or(0);
-        let min_y = data.keys().map(|c| c.y).min().unwrap_or(0);
+        let min_x = data.keys().map(|c| c.x).min().unwrap();
+        let min_y = data.keys().map(|c| c.y).min().unwrap();
         let max_x = data.keys().map(|c| c.x).max().expect("max_x fail");
         let max_y = data.keys().map(|c| c.y).max().expect("max_y fail");
 
@@ -147,6 +176,27 @@ impl Coord {
             grid[pt] = val;
         }
         grid
+    }
+
+    pub fn move_one(self, dir: Direction) -> Coord {
+        match dir {
+            Direction::Up => Coord {
+                x: self.x,
+                y: self.y - 1,
+            },
+            Direction::Down => Coord {
+                x: self.x,
+                y: self.y + 1,
+            },
+            Direction::Left => Coord {
+                x: self.x - 1,
+                y: self.y,
+            },
+            Direction::Right => Coord {
+                x: self.x + 1,
+                y: self.y,
+            },
+        }
     }
 }
 
